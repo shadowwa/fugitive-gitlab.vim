@@ -72,10 +72,26 @@ function! s:gitlab_api_key(domain) abort
     call gitlab#utils#throw(a:domain . ' is not a key in g:gitlab_api_keys')
 endfunction
 
+function! s:gitlab_proxie(domain) abort
+    if exists('b:gitlab_proxies') && has_key(b:gitlab_proxies, a:domain)
+        return b:gitlab_proxies[a:domain]
+    endif
+
+    " gitlab_proxies: { "gitlab.com": "myproxy" }
+    if exists('g:gitlab_proxies')
+        let key = get(g:gitlab_proxies, a:domain)
+        if !empty(key)
+            return key
+        endif
+    endif
+    return ''
+endfunction
+
 " Makes a request to the api and returns the resulting text
 " :call setreg('+', b:gitlab_last_curl)
 function! gitlab#api#request(domain, path, ...) abort
     let key = s:gitlab_api_key(a:domain)
+    let proxy = s:gitlab_proxie(a:domain)
     let domains = gitlab#utils#parse_gitlab_domains()
     let root = get(domains, a:domain)
     if empty(root)
@@ -107,6 +123,9 @@ function! gitlab#api#request(domain, path, ...) abort
     endif
 
     let data = ['-q', '--silent', '-A', 'fugitive-gitlab.vim']
+    if len(proxy) > 0
+        call extend(data, ['-x', proxy])
+    endif
     for header in headers
         call extend(data, ['-H', header])
     endfor
